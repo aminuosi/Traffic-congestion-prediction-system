@@ -6,6 +6,7 @@ import re
 import time
 
 from sample_data import calculate_distances
+from lane_decision import build_lane_decision
 
 LONG_VIDEO_SECONDS = 5 * 60
 LONG_VIDEO_ACCELERATION = 5
@@ -138,7 +139,7 @@ def analyze_video_full(video_path, point_index=0, model_path=None):
     flow = detected_vehicles / seconds if seconds else 0
     density = sum(density_samples) / len(density_samples) if density_samples else 0
     avg_speed = estimate_speed_from_density(density)
-    tpi = calculate_tpi(flow, avg_speed)
+    tpi = calculate_tpi(flow, density, avg_speed)
 
     return {
         "ok": True,
@@ -213,10 +214,13 @@ def estimate_speed_from_density(density):
     return max(15, free_speed - density * 0.8)
 
 
-def calculate_tpi(flow, avg_speed):
+def calculate_tpi(flow, density, avg_speed):
     free_speed = 90
-    speed_penalty = max(0, free_speed - avg_speed)
-    return flow * 6 + speed_penalty * 1.2
+    speed_drop = max(0, min(1, (free_speed - avg_speed) / free_speed))
+    flow_pressure = min(1, flow / 2.5)
+    density_pressure = min(1, density / 18)
+    occupancy = max(flow_pressure, density_pressure)
+    return (density_pressure * 38) + (flow_pressure * 28) + (speed_drop * occupancy * 34)
 
 
 def classify_tpi(tpi):
@@ -238,8 +242,8 @@ def build_prediction_summary(route):
 
     max_point = max(points, key=lambda item: item.get("tpi", 0), default=None)
 
-    return {
-        "status": "建议开启应急车道",
+    summary = {
+        "status": "",
         "warningTime": "13:28:07",
         "congestionWindow": "13:38:07 - 14:22:27",
         "keySegment": segment,
@@ -253,3 +257,8 @@ def build_prediction_summary(route):
         ],
         "points": points,
     }
+    lane_decision = build_lane_decision(summary)
+    summary["laneDecision"] = lane_decision
+    summary["status"] = lane_decision["decision"]
+    summary["reason"] = lane_decision["reason"]
+    return summary

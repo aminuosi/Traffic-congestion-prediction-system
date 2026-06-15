@@ -1,4 +1,12 @@
-from analyzer import analyze_video_full, build_prediction_summary, dependency_status, extract_real_time_from_filename, summarize_route
+from analyzer import (
+    analyze_video_full,
+    build_prediction_summary,
+    calculate_tpi,
+    dependency_status,
+    extract_real_time_from_filename,
+    summarize_route,
+)
+from lane_decision import build_lane_decision
 from sample_data import get_preset_route
 
 
@@ -13,6 +21,7 @@ def test_prediction_summary():
     route = get_preset_route()
     summary = build_prediction_summary(route)
     assert summary["status"] == "建议开启应急车道"
+    assert summary["laneDecision"]["mode"] == "open_lane"
     assert summary["warningTime"] == "13:28:07"
     assert summary["keySegment"] == "观测点 3 至 观测点 4"
 
@@ -43,6 +52,15 @@ def test_extract_real_time_from_filename():
     assert result["durationSeconds"] == 4279
 
 
+def test_low_flow_low_density_does_not_produce_severe_tpi():
+    assert calculate_tpi(flow=0.04, density=2.0, avg_speed=55.0) < 25
+
+
+def test_lane_decision_holds_when_tpi_is_low():
+    decision = build_lane_decision({"points": [{"tpi": 8}, {"tpi": 10}, {"tpi": 12}]})
+    assert decision["decision"] == "暂不开启"
+
+
 def test_analyze_video_full_does_not_fake_results_when_dependencies_missing():
     status = dependency_status()
     if status["ready"]:
@@ -58,5 +76,7 @@ if __name__ == "__main__":
     test_summarize_route_recalculates_distances()
     test_dependency_status_reports_missing_yolo_stack()
     test_extract_real_time_from_filename()
+    test_low_flow_low_density_does_not_produce_severe_tpi()
+    test_lane_decision_holds_when_tpi_is_low()
     test_analyze_video_full_does_not_fake_results_when_dependencies_missing()
     print("backend tests passed")

@@ -1,15 +1,18 @@
 import {
-  appendUploadedFiles,
+  appendUploadingFiles,
   createEmptyRoute,
   createPredictionSummary,
   createPresetRoute,
+  hasPendingAnalysis,
   movePoint,
+  withUploadState,
   updateSegmentDistance,
 } from "./model.js";
 
 let route = createPresetRoute();
 let selectedPointId = route.points[0]?.id ?? null;
 let draggedPointId = null;
+let latestPrediction = null;
 const API_BASE = "http://127.0.0.1:8099";
 
 const pointList = document.querySelector("#pointList");
@@ -28,36 +31,49 @@ const tpiValue = document.querySelector("#tpiValue");
 const statusValue = document.querySelector("#statusValue");
 const tpiBars = document.querySelector("#tpiBars");
 const decisionCard = document.querySelector("#decisionCard");
+const predictBtn = document.querySelector("#predictBtn");
 
 document.querySelector("#loadPresetBtn").addEventListener("click", async () => {
   route = await loadPresetRoute();
   selectedPointId = route.points[0]?.id ?? null;
+  latestPrediction = null;
   render();
 });
 
 document.querySelector("#emptyRouteBtn").addEventListener("click", () => {
   route = createEmptyRoute();
   selectedPointId = null;
+  latestPrediction = null;
   render();
 });
 
 document.querySelector("#predictBtn").addEventListener("click", async () => {
-  renderDecision(await requestPrediction(route));
+  latestPrediction = await requestPrediction(route);
+  renderDecision(latestPrediction);
 });
 
 routeNameInput.addEventListener("input", (event) => {
   route = { ...route, name: event.target.value };
+  latestPrediction = null;
 });
 
 routeDirectionInput.addEventListener("input", (event) => {
   route = { ...route, direction: event.target.value };
+  latestPrediction = null;
 });
 
 videoUpload.addEventListener("change", async (event) => {
-  route = await uploadVideos(route, event.target.files);
+  const files = Array.from(event.target.files || []);
+  if (files.length === 0) {
+    return;
+  }
+  route = appendUploadingFiles(route, files);
+  const createdPointIds = route.points.slice(-files.length).map((point) => point.id);
+  selectedPointId = route.points.at(-1)?.id ?? selectedPointId;
+  render();
+  void uploadVideos(route, files, createdPointIds);
   selectedPointId = route.points.at(-1)?.id ?? selectedPointId;
   videoUpload.value = "";
-  render();
 });
 
 async function loadPresetRoute() {
@@ -88,7 +104,7 @@ async function requestPrediction(currentRoute) {
   }
 }
 
-async function uploadVideos(currentRoute, files) {
+async function uploadVideos(currentRoute, files, localPointIds = []) {
   const fileList = Array.from(files);
   if (fileList.length === 0) {
     return currentRoute;
@@ -105,28 +121,30 @@ async function uploadVideos(currentRoute, files) {
       throw new Error("upload request failed");
     }
     const payload = await response.json();
-    const analyzedPoints = await analyzeUploadedVideos(payload.points);
-    return {
-      ...currentRoute,
-      mode: "upload",
-      points: [...currentRoute.points, ...analyzedPoints].map((point, index, all) => {
-        const distanceFromStartKm = all
-          .slice(0, index + 1)
-          .reduce((total, item, itemIndex) => {
-            if (itemIndex === 0) return 0;
-            return total + Number(item.distanceFromPreviousKm || 0);
-          }, 0);
-        return { ...point, distanceFromStartKm: Number(distanceFromStartKm.toFixed(2)) };
-      }),
-    };
+    const uploadedFiles = payload.points || [];
+    await analyzeUploadedVideos(uploadedFiles, localPointIds);
   } catch (error) {
-    return appendUploadedFiles(currentRoute, fileList);
+    localPointIds.forEach((pointId) => {
+      updatePoint(pointId, {
+        status: "上传失败",
+        analysisStatus: "ready",
+        analysisProgress: 100,
+        analysisMessage: "文件上传失败，请确认后端服务已启动。",
+      });
+    });
+    render();
   }
 }
 
-async function analyzeUploadedVideos(points) {
-  const analyzed = [];
+async function analyzeUploadedVideos(points, localPointIds = []) {
   for (const [index, point] of points.entries()) {
+    const localPointId = localPointIds[index] || point.id;
+    updatePoint(localPointId, {
+      fileUrl: point.fileUrl,
+      analysisStatus: "analyzing",
+      analysisProgress: 20,
+      analysisMessage: "后端正在进行 YOLO 分析，请稍候。",
+    });
     try {
       const response = await fetch(`${API_BASE}/api/analyze-video`, {
         method: "POST",
@@ -138,23 +156,43 @@ async function analyzeUploadedVideos(points) {
       }
       const result = await response.json();
       if (result.ok && result.point) {
-        analyzed.push(result.point);
+        updatePoint(localPointId, {
+          ...result.point,
+          id: localPointId,
+          name: route.points.find((item) => item.id === localPointId)?.name || result.point.name,
+          analysisStatus: "ready",
+          analysisProgress: 100,
+          analysisMessage: result.accelerationApplied
+            ? `已按真实时长校正，视频加速比 ${result.accelerationRatio}。`
+            : "真实分析完成。",
+        });
       } else {
-        analyzed.push({
-          ...point,
+        updatePoint(localPointId, {
           status: result.status || "真实分析未执行",
+          analysisStatus: "ready",
+          analysisProgress: 100,
           analysisMessage: result.message || (result.missing ? `缺少依赖：${result.missing.join(", ")}` : ""),
         });
       }
     } catch (error) {
-      analyzed.push({
-        ...point,
+      updatePoint(localPointId, {
         status: "真实分析请求失败",
+        analysisStatus: "ready",
+        analysisProgress: 100,
         analysisMessage: "后端分析接口暂不可用，当前仅保存视频。",
       });
     }
+    render();
   }
-  return analyzed;
+}
+
+function updatePoint(pointId, patch) {
+  route = {
+    ...route,
+    points: route.points.map((point) =>
+      point.id === pointId ? withUploadState({ ...point, ...patch }, patch) : point
+    ),
+  };
 }
 
 function getSelectedPoint() {
@@ -168,7 +206,13 @@ function render() {
   renderDistances();
   renderSelectedPoint();
   renderTpiBars();
-  renderDecisionPlaceholder();
+  if (latestPrediction) {
+    renderDecision(latestPrediction);
+  } else {
+    renderDecisionPlaceholder();
+  }
+  predictBtn.disabled = hasPendingAnalysis(route.points);
+  predictBtn.classList.toggle("is-disabled", predictBtn.disabled);
 }
 
 function renderPoints() {
@@ -188,9 +232,13 @@ function renderPoints() {
       <div class="camera-dot">${index + 1}</div>
       <div class="point-name">${point.name}</div>
       <div class="point-file">${point.videoName}</div>
+      <div class="point-progress ${point.analysisStatus || "ready"}">
+        <span style="width: ${point.analysisProgress ?? 100}%"></span>
+      </div>
       <div class="point-stat"><span>距起点</span><strong>${point.distanceFromStartKm ?? 0} km</strong></div>
       <div class="point-stat"><span>开始时间</span><strong>${point.startTime}</strong></div>
       <div class="point-stat"><span>状态</span><strong>${point.status}</strong></div>
+      <div class="point-progress-text">${point.analysisMessage || " "}</div>
     `;
 
     card.addEventListener("click", () => {
@@ -292,11 +340,16 @@ function renderSelectedPoint() {
     `;
   }
 
+  const detail = document.querySelector(".video-detail");
+  const existing = detail.querySelector(".analysis-note");
+  if (existing) {
+    existing.remove();
+  }
   if (point.analysisMessage) {
     const note = document.createElement("p");
     note.className = "analysis-note";
     note.textContent = point.analysisMessage;
-    videoFrame.insertAdjacentElement("afterend", note);
+    detail.appendChild(note);
   }
 }
 

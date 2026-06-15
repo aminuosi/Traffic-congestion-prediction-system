@@ -132,6 +132,14 @@ h3 {
   background: var(--blue);
 }
 
+.primary-btn:disabled,
+.primary-btn.is-disabled {
+  cursor: not-allowed;
+  color: #eef3f8;
+  background: #91a8bf;
+  opacity: 0.78;
+}
+
 .secondary-btn {
   color: var(--blue-dark);
   background: #edf4fb;
@@ -292,6 +300,35 @@ input {
   -webkit-box-orient: vertical;
 }
 
+.point-progress {
+  height: 7px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: #e6edf3;
+  overflow: hidden;
+}
+
+.point-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+  transition: width 0.25s ease;
+}
+
+.point-progress.uploading span,
+.point-progress.analyzing span {
+  background: linear-gradient(90deg, var(--blue), var(--green));
+}
+
+.point-progress-text {
+  min-height: 30px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .point-stat {
   display: flex;
   justify-content: space-between;
@@ -336,7 +373,7 @@ input {
 .video-filebar {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f7f9fb;
@@ -350,7 +387,7 @@ input {
 
 .video-filebar strong {
   color: var(--ink);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -413,8 +450,8 @@ input {
 
 .video-detail {
   align-self: start;
-  min-height: 126px;
-  padding: 14px;
+  min-height: 112px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-soft);

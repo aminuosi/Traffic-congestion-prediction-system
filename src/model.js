@@ -128,7 +128,7 @@ export function createUploadedPoint(file, index) {
     id: `upload-${Date.now()}-${index}`,
     name: `上传视频 ${index + 1}`,
     videoName: file.name,
-    fileUrl: URL.createObjectURL(file),
+    fileUrl: createLocalPreviewUrl(file),
     startTime: "--:--:--",
     distanceFromPreviousKm: index === 0 ? 0 : 1,
     flow: Number((2.4 + index * 0.45).toFixed(2)),
@@ -137,6 +137,46 @@ export function createUploadedPoint(file, index) {
     tpi: Number((12 + index * 13.5).toFixed(2)),
     status: index > 1 ? "待重点关注" : "分析完成",
   };
+}
+
+function createLocalPreviewUrl(file) {
+  if (typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
+    try {
+      return URL.createObjectURL(file);
+    } catch (error) {
+      return "";
+    }
+  }
+  return "";
+}
+
+export function appendUploadingFiles(route, files) {
+  const created = Array.from(files).map((file, index) =>
+    withUploadState(createUploadedPoint(file, index), {
+      analysisStatus: "uploading",
+      analysisProgress: 8,
+      analysisMessage: "文件已加入路段，正在上传并分析。",
+    })
+  );
+
+  return {
+    ...route,
+    mode: "upload",
+    points: withDistances([...route.points, ...created]),
+  };
+}
+
+export function withUploadState(point, state) {
+  return {
+    ...point,
+    analysisStatus: state.analysisStatus ?? point.analysisStatus ?? "ready",
+    analysisProgress: state.analysisProgress ?? point.analysisProgress ?? 100,
+    analysisMessage: state.analysisMessage ?? point.analysisMessage ?? "",
+  };
+}
+
+export function hasPendingAnalysis(points) {
+  return points.some((point) => ["uploading", "analyzing"].includes(point.analysisStatus));
 }
 
 export function appendUploadedFiles(route, files) {

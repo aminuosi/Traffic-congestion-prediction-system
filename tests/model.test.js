@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   createPresetRoute,
+  appendUploadingFiles,
+  hasPendingAnalysis,
   movePoint,
   updateSegmentDistance,
   calculateDistanceFromStart,
@@ -38,6 +40,18 @@ test("updateSegmentDistance recalculates distance from route start", () => {
 
   assert.deepEqual(distances.map((value) => Number(value.toFixed(2))), [0, 1.2, 3.45, 5.05]);
   assert.equal(updated.points[2].distanceFromPreviousKm, 2.25);
+});
+
+test("appendUploadingFiles marks only new videos as pending analysis", () => {
+  const route = createPresetRoute();
+  const files = [{ name: "new-a.mp4" }, { name: "new-b.mp4" }];
+  const updated = appendUploadingFiles(route, files);
+
+  assert.equal(updated.points.length, 6);
+  assert.equal(updated.points[0].analysisStatus, undefined);
+  assert.equal(updated.points[4].analysisStatus, "uploading");
+  assert.equal(updated.points[5].analysisProgress, 8);
+  assert.equal(hasPendingAnalysis(updated.points), true);
 });
 
 test("createPredictionSummary reports congestion window and lane decision", () => {

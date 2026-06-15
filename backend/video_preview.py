@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 from urllib.parse import quote
 
 
@@ -26,37 +27,46 @@ def resolve_media_path(root, upload_dir, relative):
     return None
 
 
-def mjpeg_frames(video_path, max_width=960, preview_stride=3):
+def mjpeg_frames(video_path, max_width=960, preview_stride=3, preview_fps=10, loop=True):
     import cv2
 
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-      return
+    delay = 1 / max(preview_fps, 1)
 
-    frame_index = 0
-    try:
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
-            if frame_index % preview_stride != 0:
+    while True:
+        cap = cv2.VideoCapture(str(video_path))
+        if not cap.isOpened():
+            return
+
+        frame_index = 0
+        emitted = False
+        try:
+            while True:
+                ok, frame = cap.read()
+                if not ok:
+                    break
+                if frame_index % preview_stride != 0:
+                    frame_index += 1
+                    continue
+                height, width = frame.shape[:2]
+                if width > max_width:
+                    new_height = int(height * (max_width / width))
+                    frame = cv2.resize(frame, (max_width, new_height))
+                ok, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 78])
+                if ok:
+                    emitted = True
+                    yield (
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n\r\n"
+                        + buffer.tobytes()
+                        + b"\r\n"
+                    )
+                    time.sleep(delay)
                 frame_index += 1
-                continue
-            height, width = frame.shape[:2]
-            if width > max_width:
-                new_height = int(height * (max_width / width))
-                frame = cv2.resize(frame, (max_width, new_height))
-            ok, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 78])
-            if ok:
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n"
-                    + buffer.tobytes()
-                    + b"\r\n"
-                )
-            frame_index += 1
-    finally:
-        cap.release()
+        finally:
+            cap.release()
+
+        if not loop or not emitted:
+            break
 
 
 def preview_url(media_url):
