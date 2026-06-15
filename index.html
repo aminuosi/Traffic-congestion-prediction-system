@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智行枢纽 | 高速公路拥堵预测系统</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Highway Congestion Prediction Workbench</p>
+          <h1>智行枢纽</h1>
+          <p class="subtitle">多视频路段建模、交通流分析与应急车道启用决策 Web 演示系统</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary-btn" id="emptyRouteBtn">新建路段</button>
+          <button class="primary-btn" id="loadPresetBtn">加载论文案例</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="route-panel" aria-label="路段建模器">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Route Builder</p>
+              <h2>路段建模器</h2>
+            </div>
+            <label class="upload-btn">
+              上传视频
+              <input id="videoUpload" type="file" accept="video/*" multiple />
+            </label>
+          </div>
+
+          <div class="route-meta">
+            <label>
+              路段名称
+              <input id="routeNameInput" type="text" />
+            </label>
+            <label>
+              方向
+              <input id="routeDirectionInput" type="text" />
+            </label>
+          </div>
+
+          <div class="route-canvas">
+            <div class="road-line" aria-hidden="true"></div>
+            <div id="pointList" class="point-list"></div>
+          </div>
+
+          <div class="distance-editor">
+            <div class="section-title">相邻视频距离设置</div>
+            <div id="distanceInputs" class="distance-inputs"></div>
+          </div>
+        </section>
+
+        <section class="analysis-panel" aria-label="分析面板">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Analysis</p>
+              <h2>分析面板</h2>
+            </div>
+            <button class="primary-btn" id="predictBtn">开始预测</button>
+          </div>
+
+          <div class="selected-video">
+            <div class="video-stack">
+              <div class="video-filebar">
+                <span>视频文件</span>
+                <strong id="selectedVideoFile">请在左侧点击视频卡片</strong>
+              </div>
+              <div class="video-frame" id="videoFrame">
+                <div class="video-placeholder">选择一个视频点位查看预览</div>
+              </div>
+            </div>
+            <div class="video-detail">
+              <p class="eyebrow">Current Point</p>
+              <h3 id="selectedPointName">未选择点位</h3>
+              <p id="selectedPointFile" class="muted">点位信息</p>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric-card">
+              <span class="metric-label">
+                Flow
+                <button class="help-icon" type="button" aria-label="Flow 参数说明" data-tooltip="Flow 表示单位时间内通过观测断面的车辆数量，用于衡量当前路段交通流量。">?</button>
+              </span>
+              <strong id="flowValue">--</strong>
+              <small>车/秒</small>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">
+                Density
+                <button class="help-icon" type="button" aria-label="Density 参数说明" data-tooltip="Density 表示单位道路长度内的车辆数量，数值越高说明车辆越密集，拥堵风险越高。">?</button>
+              </span>
+              <strong id="densityValue">--</strong>
+              <small>车/km</small>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">
+                Average Speed
+                <button class="help-icon" type="button" aria-label="Average Speed 参数说明" data-tooltip="Average Speed 表示当前观测窗口内车辆的平均行驶速度，速度下降通常意味着交通状态恶化。">?</button>
+              </span>
+              <strong id="speedValue">--</strong>
+              <small>km/h</small>
+            </div>
+            <div class="metric-card alert">
+              <span class="metric-label">
+                TPI
+                <button class="help-icon" type="button" aria-label="TPI 参数说明" data-tooltip="TPI 是交通拥堵指数，综合流量、速度等信息衡量拥堵程度，数值越高表示越拥堵。">?</button>
+              </span>
+              <strong id="tpiValue">--</strong>
+              <small id="statusValue">待分析</small>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="section-title">路段 TPI 走势</div>
+            <div id="tpiBars" class="tpi-bars"></div>
+          </div>
+
+          <div class="decision-card" id="decisionCard">
+            <div class="section-title">预测与决策输出</div>
+            <p class="muted">完成路段排布后点击“开始预测”。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,1349 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智行枢纽 | 高速公路拥堵预测系统</title>
+    <style>
+:root {
+  --bg: #eef3f6;
+  --surface: #ffffff;
+  --surface-soft: #f6f8fa;
+  --ink: #17212f;
+  --muted: #637083;
+  --line: #d8e0e7;
+  --blue: #1d5d9b;
+  --blue-dark: #123b66;
+  --green: #17735d;
+  --gold: #9a6b00;
+  --red: #aa2e25;
+  --shadow: 0 18px 48px rgba(24, 38, 54, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    linear-gradient(135deg, rgba(238, 243, 246, 0.98), rgba(226, 234, 239, 0.98)),
+    linear-gradient(90deg, rgba(29, 93, 155, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(29, 93, 155, 0.06) 1px, transparent 1px);
+  background-size: auto, 44px 44px, 44px 44px;
+  font-family:
+    "Microsoft YaHei",
+    "PingFang SC",
+    Arial,
+    sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1440px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0;
+}
+
+.topbar,
+.route-panel,
+.analysis-panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(216, 224, 231, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 118px;
+  padding: 24px 28px;
+  border-radius: 8px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 6px;
+  color: var(--blue-dark);
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+h2 {
+  margin-bottom: 0;
+  color: var(--blue-dark);
+  font-size: 22px;
+}
+
+h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.subtitle,
+.muted {
+  color: var(--muted);
+}
+
+.subtitle {
+  margin-bottom: 0;
+  font-size: 15px;
+}
+
+.topbar-actions,
+.panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.primary-btn,
+.secondary-btn,
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.primary-btn {
+  color: white;
+  background: var(--blue);
+}
+
+.secondary-btn {
+  color: var(--blue-dark);
+  background: #edf4fb;
+  border-color: #c7d8ea;
+}
+
+.upload-btn {
+  color: var(--green);
+  background: #eef8f4;
+  border-color: #c5ded6;
+}
+
+.upload-btn input {
+  display: none;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(560px, 0.95fr) minmax(460px, 1.05fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.route-panel,
+.analysis-panel {
+  min-height: calc(100vh - 178px);
+  padding: 22px;
+  border-radius: 8px;
+}
+
+.panel-heading {
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.route-meta {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: white;
+}
+
+.route-canvas {
+  position: relative;
+  min-height: 310px;
+  padding: 48px 12px 28px;
+  border: 1px dashed #c8d4df;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fbfcfd, #f5f8fa);
+  overflow-x: auto;
+}
+
+.road-line {
+  position: absolute;
+  left: 38px;
+  right: 38px;
+  top: 128px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6b7a89, #2f3d4c);
+}
+
+.road-line::before,
+.road-line::after {
+  position: absolute;
+  top: -22px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.road-line::before {
+  content: "起点";
+  left: 0;
+}
+
+.road-line::after {
+  content: "终点";
+  right: 0;
+}
+
+.point-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(150px, 1fr);
+  gap: 14px;
+  min-width: max-content;
+}
+
+.point-card {
+  width: 150px;
+  min-height: 210px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 8px 22px rgba(19, 44, 70, 0.08);
+  cursor: grab;
+}
+
+.point-card.selected {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 93, 155, 0.14);
+}
+
+.point-card.drag-over {
+  border-color: var(--green);
+  background: #f0faf6;
+}
+
+.camera-dot {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  color: white;
+  background: var(--blue-dark);
+  font-weight: 800;
+}
+
+.point-name {
+  margin-bottom: 6px;
+  color: var(--blue-dark);
+  font-weight: 800;
+}
+
+.point-file {
+  display: -webkit-box;
+  min-height: 40px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.point-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 7px;
+  border-top: 1px solid #eef2f5;
+  font-size: 12px;
+}
+
+.section-title {
+  margin-bottom: 10px;
+  color: var(--blue-dark);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.distance-editor {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.distance-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.selected-video {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.65fr) minmax(190px, 0.55fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.video-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.video-filebar {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f9fb;
+}
+
+.video-filebar span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.video-filebar strong {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.video-frame {
+  display: grid;
+  min-height: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #111827;
+}
+
+.video-frame video,
+.video-preview-stream {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-preview-stream {
+  display: block;
+  min-height: 300px;
+  background: #111827;
+}
+
+.video-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  color: #cbd6e2;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 12px;
+}
+
+.video-actions a {
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.analysis-note {
+  margin: -6px 0 12px;
+  padding: 9px 11px;
+  border: 1px solid #ead3a4;
+  border-radius: 6px;
+  color: #765000;
+  background: #fff8e7;
+  font-size: 13px;
+}
+
+.video-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  color: #c7d2de;
+  text-align: center;
+}
+
+.video-detail {
+  align-self: start;
+  min-height: 126px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.video-detail h3 {
+  margin-bottom: 6px;
+  font-size: 17px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  min-height: 104px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.metric-card span,
+.metric-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.metric-card .metric-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.help-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 1px solid #b8c7d6;
+  border-radius: 999px;
+  color: var(--blue);
+  background: #f5f9fd;
+  cursor: help;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.help-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  width: min(260px, 72vw);
+  padding: 10px 12px;
+  border: 1px solid #c9d5df;
+  border-radius: 6px;
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(20, 35, 52, 0.16);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.help-icon::before {
+  content: "";
+  position: absolute;
+  z-index: 21;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  width: 9px;
+  height: 9px;
+  border-right: 1px solid #c9d5df;
+  border-bottom: 1px solid #c9d5df;
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px) rotate(45deg);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.help-icon:hover::after,
+.help-icon:focus-visible::after,
+.help-icon:hover::before,
+.help-icon:focus-visible::before {
+  opacity: 1;
+  transform: translate(-50%, 0) rotate(0);
+}
+
+.help-icon:hover::before,
+.help-icon:focus-visible::before {
+  transform: translate(-50%, 0) rotate(45deg);
+}
+
+.metric-card strong {
+  display: block;
+  margin: 8px 0 4px;
+  color: var(--blue-dark);
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.metric-card.alert strong {
+  color: var(--red);
+}
+
+.chart-card,
+.decision-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.chart-card {
+  margin-bottom: 16px;
+}
+
+.tpi-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.tpi-row {
+  display: grid;
+  grid-template-columns: 82px 1fr 54px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.bar-track {
+  height: 14px;
+  border-radius: 999px;
+  background: #e7edf2;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), var(--gold), var(--red));
+}
+
+.decision-status {
+  display: inline-flex;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: white;
+  background: var(--red);
+  font-weight: 800;
+}
+
+.decision-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.decision-item {
+  padding: 10px;
+  border-radius: 6px;
+  background: #f7f9fb;
+}
+
+.decision-item span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.model-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.model-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: #f3f7fb;
+  font-size: 13px;
+}
+
+@media (max-width: 1040px) {
+  .workspace,
+  .selected-video {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 680px) {
+  .app-shell {
+    width: min(100vw - 18px, 1440px);
+    padding: 9px 0;
+  }
+
+  .route-meta,
+  .metric-grid,
+  .decision-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar,
+  .route-panel,
+  .analysis-panel {
+    padding: 16px;
+  }
+}
+
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Highway Congestion Prediction Workbench</p>
+          <h1>智行枢纽</h1>
+          <p class="subtitle">多视频路段建模、交通流分析与应急车道启用决策 Web 演示系统</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary-btn" id="emptyRouteBtn">新建路段</button>
+          <button class="primary-btn" id="loadPresetBtn">加载论文案例</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="route-panel" aria-label="路段建模器">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Route Builder</p>
+              <h2>路段建模器</h2>
+            </div>
+            <label class="upload-btn">
+              上传视频
+              <input id="videoUpload" type="file" accept="video/*" multiple />
+            </label>
+          </div>
+
+          <div class="route-meta">
+            <label>
+              路段名称
+              <input id="routeNameInput" type="text" />
+            </label>
+            <label>
+              方向
+              <input id="routeDirectionInput" type="text" />
+            </label>
+          </div>
+
+          <div class="route-canvas">
+            <div class="road-line" aria-hidden="true"></div>
+            <div id="pointList" class="point-list"></div>
+          </div>
+
+          <div class="distance-editor">
+            <div class="section-title">相邻视频距离设置</div>
+            <div id="distanceInputs" class="distance-inputs"></div>
+          </div>
+        </section>
+
+        <section class="analysis-panel" aria-label="分析面板">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Analysis</p>
+              <h2>分析面板</h2>
+            </div>
+            <button class="primary-btn" id="predictBtn">开始预测</button>
+          </div>
+
+          <div class="selected-video">
+            <div class="video-stack">
+              <div class="video-filebar">
+                <span>视频文件</span>
+                <strong id="selectedVideoFile">请在左侧点击视频卡片</strong>
+              </div>
+              <div class="video-frame" id="videoFrame">
+                <div class="video-placeholder">选择一个视频点位查看预览</div>
+              </div>
+            </div>
+            <div class="video-detail">
+              <p class="eyebrow">Current Point</p>
+              <h3 id="selectedPointName">未选择点位</h3>
+              <p id="selectedPointFile" class="muted">点位信息</p>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric-card">
+              <span class="metric-label">
+                Flow
+                <button class="help-icon" type="button" aria-label="Flow 参数说明" data-tooltip="Flow 表示单位时间内通过观测断面的车辆数量，用于衡量当前路段交通流量。">?</button>
+              </span>
+              <strong id="flowValue">--</strong>
+              <small>车/秒</small>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">
+                Density
+                <button class="help-icon" type="button" aria-label="Density 参数说明" data-tooltip="Density 表示单位道路长度内的车辆数量，数值越高说明车辆越密集，拥堵风险越高。">?</button>
+              </span>
+              <strong id="densityValue">--</strong>
+              <small>车/km</small>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">
+                Average Speed
+                <button class="help-icon" type="button" aria-label="Average Speed 参数说明" data-tooltip="Average Speed 表示当前观测窗口内车辆的平均行驶速度，速度下降通常意味着交通状态恶化。">?</button>
+              </span>
+              <strong id="speedValue">--</strong>
+              <small>km/h</small>
+            </div>
+            <div class="metric-card alert">
+              <span class="metric-label">
+                TPI
+                <button class="help-icon" type="button" aria-label="TPI 参数说明" data-tooltip="TPI 是交通拥堵指数，综合流量、速度等信息衡量拥堵程度，数值越高表示越拥堵。">?</button>
+              </span>
+              <strong id="tpiValue">--</strong>
+              <small id="statusValue">待分析</small>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="section-title">路段 TPI 走势</div>
+            <div id="tpiBars" class="tpi-bars"></div>
+          </div>
+
+          <div class="decision-card" id="decisionCard">
+            <div class="section-title">预测与决策输出</div>
+            <p class="muted">完成路段排布后点击“开始预测”。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+const presetPoints = [
+  {
+    id: "p1",
+    name: "观测点 1",
+    videoName: "1_1_20240501_20240501114103_20240501135755_114103.mp4",
+    fileUrl: "/media/preset/1_1_20240501_20240501114103_20240501135755_114103.mp4",
+    startTime: "11:41:03",
+    distanceFromPreviousKm: 0,
+    flow: 3.6,
+    density: 72.4,
+    avgSpeed: 58.6,
+    tpi: 21.16,
+    status: "轻微拥堵",
+  },
+  {
+    id: "p2",
+    name: "观测点 2",
+    videoName: "2_1_20240501_20240501115227_20240501130415_115227.mp4",
+    fileUrl: "/media/preset/2_1_20240501_20240501115227_20240501130415_115227.mp4",
+    startTime: "11:52:27",
+    distanceFromPreviousKm: 1.2,
+    flow: 2.8,
+    density: 61.8,
+    avgSpeed: 64.2,
+    tpi: 9.34,
+    status: "基本畅通",
+  },
+  {
+    id: "p3",
+    name: "观测点 3",
+    videoName: "3_1_20240501_20240501113543_20240501135236_113542.mp4",
+    fileUrl: "/media/preset/3_1_20240501_20240501113543_20240501135236_113542.mp4",
+    startTime: "11:35:43",
+    distanceFromPreviousKm: 1.85,
+    flow: 4.1,
+    density: 84.7,
+    avgSpeed: 42.5,
+    tpi: 45.43,
+    status: "拥堵抬升",
+  },
+  {
+    id: "p4",
+    name: "观测点 4",
+    videoName: "4_1_20240501_20240501125647_20240501140806_125649.mp4",
+    fileUrl: "/media/preset/4_1_20240501_20240501125647_20240501140806_125649.mp4",
+    startTime: "12:56:47",
+    distanceFromPreviousKm: 1.6,
+    flow: 4.5,
+    density: 91.3,
+    avgSpeed: 35.9,
+    tpi: 84.04,
+    status: "严重拥堵",
+  },
+];
+
+function calculateDistanceFromStart(points) {
+  let total = 0;
+  return points.map((point, index) => {
+    if (index > 0) {
+      total += Number(point.distanceFromPreviousKm || 0);
+    }
+    return total;
+  });
+}
+
+function withDistances(points) {
+  const distances = calculateDistanceFromStart(points);
+  return points.map((point, index) => ({
+    ...point,
+    distanceFromStartKm: Number(distances[index].toFixed(2)),
+  }));
+}
+
+function createPresetRoute() {
+  return {
+    id: "preset-route",
+    name: "长深高速东庐山服务区示范路段",
+    direction: "上游至下游",
+    totalLengthKm: 4.65,
+    mode: "preset",
+    points: withDistances(presetPoints),
+  };
+}
+
+function movePoint(route, draggedId, targetId) {
+  if (draggedId === targetId) {
+    return route;
+  }
+
+  const nextPoints = route.points.map((point) => ({ ...point }));
+  const fromIndex = nextPoints.findIndex((point) => point.id === draggedId);
+  const toIndex = nextPoints.findIndex((point) => point.id === targetId);
+
+  if (fromIndex < 0 || toIndex < 0) {
+    return route;
+  }
+
+  const [dragged] = nextPoints.splice(fromIndex, 1);
+  nextPoints.splice(toIndex, 0, dragged);
+  nextPoints[0].distanceFromPreviousKm = 0;
+
+  return {
+    ...route,
+    points: withDistances(nextPoints),
+  };
+}
+
+function updateSegmentDistance(route, pointId, distanceKm) {
+  const nextPoints = route.points.map((point) => {
+    if (point.id !== pointId) {
+      return { ...point };
+    }
+    return {
+      ...point,
+      distanceFromPreviousKm: Number(distanceKm),
+    };
+  });
+
+  return {
+    ...route,
+    totalLengthKm: Number(calculateDistanceFromStart(nextPoints).at(-1).toFixed(2)),
+    points: withDistances(nextPoints),
+  };
+}
+
+function createUploadedPoint(file, index) {
+  return {
+    id: `upload-${Date.now()}-${index}`,
+    name: `上传视频 ${index + 1}`,
+    videoName: file.name,
+    fileUrl: URL.createObjectURL(file),
+    startTime: "--:--:--",
+    distanceFromPreviousKm: index === 0 ? 0 : 1,
+    flow: Number((2.4 + index * 0.45).toFixed(2)),
+    density: Number((48 + index * 8.5).toFixed(2)),
+    avgSpeed: Number((78 - index * 9.2).toFixed(2)),
+    tpi: Number((12 + index * 13.5).toFixed(2)),
+    status: index > 1 ? "待重点关注" : "分析完成",
+  };
+}
+
+function appendUploadedFiles(route, files) {
+  const created = Array.from(files).map((file, index) =>
+    createUploadedPoint(file, route.points.length + index)
+  );
+
+  return {
+    ...route,
+    mode: "upload",
+    points: withDistances([...route.points, ...created]),
+  };
+}
+
+function createEmptyRoute() {
+  return {
+    id: "custom-route",
+    name: "自定义高速路段",
+    direction: "上游至下游",
+    totalLengthKm: 0,
+    mode: "upload",
+    points: [],
+  };
+}
+
+function createPredictionSummary(route) {
+  const points = route.points;
+  const highestTpiPoint = [...points].sort((a, b) => b.tpi - a.tpi)[0];
+  const keySegment =
+    points.length >= 4
+      ? `${points[2].name} 至 ${points[3].name}`
+      : highestTpiPoint
+        ? `${highestTpiPoint.name} 附近路段`
+        : "未形成路段";
+
+  return {
+    status: "建议开启应急车道",
+    warningTime: "13:28:07",
+    congestionWindow: "13:38:07 - 14:22:27",
+    keySegment,
+    confidence: "89.63%",
+    reason:
+      "多监测点 TPI 在空间方向上持续抬升，未来 30 分钟预测区间超过拥堵阈值，满足滑动窗口预警条件。",
+    modelScores: [
+      { model: "LSTM", mse: "0.0068", note: "主预测模型" },
+      { model: "XGBoost", mse: "0.008954", note: "对比模型" },
+      { model: "随机森林", mse: "0.010453", note: "对比模型" },
+    ],
+  };
+}
+
+
+let route = createPresetRoute();
+let selectedPointId = route.points[0]?.id ?? null;
+let draggedPointId = null;
+const API_BASE = "http://127.0.0.1:8099";
+
+const pointList = document.querySelector("#pointList");
+const distanceInputs = document.querySelector("#distanceInputs");
+const routeNameInput = document.querySelector("#routeNameInput");
+const routeDirectionInput = document.querySelector("#routeDirectionInput");
+const videoUpload = document.querySelector("#videoUpload");
+const videoFrame = document.querySelector("#videoFrame");
+const selectedVideoFile = document.querySelector("#selectedVideoFile");
+const selectedPointName = document.querySelector("#selectedPointName");
+const selectedPointFile = document.querySelector("#selectedPointFile");
+const flowValue = document.querySelector("#flowValue");
+const densityValue = document.querySelector("#densityValue");
+const speedValue = document.querySelector("#speedValue");
+const tpiValue = document.querySelector("#tpiValue");
+const statusValue = document.querySelector("#statusValue");
+const tpiBars = document.querySelector("#tpiBars");
+const decisionCard = document.querySelector("#decisionCard");
+
+document.querySelector("#loadPresetBtn").addEventListener("click", async () => {
+  route = await loadPresetRoute();
+  selectedPointId = route.points[0]?.id ?? null;
+  render();
+});
+
+document.querySelector("#emptyRouteBtn").addEventListener("click", () => {
+  route = createEmptyRoute();
+  selectedPointId = null;
+  render();
+});
+
+document.querySelector("#predictBtn").addEventListener("click", async () => {
+  renderDecision(await requestPrediction(route));
+});
+
+routeNameInput.addEventListener("input", (event) => {
+  route = { ...route, name: event.target.value };
+});
+
+routeDirectionInput.addEventListener("input", (event) => {
+  route = { ...route, direction: event.target.value };
+});
+
+videoUpload.addEventListener("change", async (event) => {
+  route = await uploadVideos(route, event.target.files);
+  selectedPointId = route.points.at(-1)?.id ?? selectedPointId;
+  videoUpload.value = "";
+  render();
+});
+
+async function loadPresetRoute() {
+  try {
+    const response = await fetch(`${API_BASE}/api/preset-route`);
+    if (!response.ok) {
+      throw new Error("preset route request failed");
+    }
+    return await response.json();
+  } catch (error) {
+    return createPresetRoute();
+  }
+}
+
+async function requestPrediction(currentRoute) {
+  try {
+    const response = await fetch(`${API_BASE}/api/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ route: currentRoute }),
+    });
+    if (!response.ok) {
+      throw new Error("prediction request failed");
+    }
+    return await response.json();
+  } catch (error) {
+    return createPredictionSummary(currentRoute);
+  }
+}
+
+async function uploadVideos(currentRoute, files) {
+  const fileList = Array.from(files);
+  if (fileList.length === 0) {
+    return currentRoute;
+  }
+
+  try {
+    const body = new FormData();
+    fileList.forEach((file) => body.append("files", file));
+    const response = await fetch(`${API_BASE}/api/upload`, {
+      method: "POST",
+      body,
+    });
+    if (!response.ok) {
+      throw new Error("upload request failed");
+    }
+    const payload = await response.json();
+    const analyzedPoints = await analyzeUploadedVideos(payload.points);
+    return {
+      ...currentRoute,
+      mode: "upload",
+      points: [...currentRoute.points, ...analyzedPoints].map((point, index, all) => {
+        const distanceFromStartKm = all
+          .slice(0, index + 1)
+          .reduce((total, item, itemIndex) => {
+            if (itemIndex === 0) return 0;
+            return total + Number(item.distanceFromPreviousKm || 0);
+          }, 0);
+        return { ...point, distanceFromStartKm: Number(distanceFromStartKm.toFixed(2)) };
+      }),
+    };
+  } catch (error) {
+    return appendUploadedFiles(currentRoute, fileList);
+  }
+}
+
+async function analyzeUploadedVideos(points) {
+  const analyzed = [];
+  for (const [index, point] of points.entries()) {
+    try {
+      const response = await fetch(`${API_BASE}/api/analyze-video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: point.videoName, index }),
+      });
+      if (!response.ok) {
+        throw new Error("analysis request failed");
+      }
+      const result = await response.json();
+      if (result.ok && result.point) {
+        analyzed.push(result.point);
+      } else {
+        analyzed.push({
+          ...point,
+          status: result.status || "真实分析未执行",
+          analysisMessage: result.message || (result.missing ? `缺少依赖：${result.missing.join(", ")}` : ""),
+        });
+      }
+    } catch (error) {
+      analyzed.push({
+        ...point,
+        status: "真实分析请求失败",
+        analysisMessage: "后端分析接口暂不可用，当前仅保存视频。",
+      });
+    }
+  }
+  return analyzed;
+}
+
+function getSelectedPoint() {
+  return route.points.find((point) => point.id === selectedPointId) ?? route.points[0] ?? null;
+}
+
+function render() {
+  routeNameInput.value = route.name;
+  routeDirectionInput.value = route.direction;
+  renderPoints();
+  renderDistances();
+  renderSelectedPoint();
+  renderTpiBars();
+  renderDecisionPlaceholder();
+}
+
+function renderPoints() {
+  pointList.innerHTML = "";
+
+  if (route.points.length === 0) {
+    pointList.innerHTML = '<div class="video-placeholder">上传视频后，可拖拽到路段上排序</div>';
+    return;
+  }
+
+  route.points.forEach((point, index) => {
+    const card = document.createElement("article");
+    card.className = `point-card${point.id === selectedPointId ? " selected" : ""}`;
+    card.draggable = true;
+    card.dataset.id = point.id;
+    card.innerHTML = `
+      <div class="camera-dot">${index + 1}</div>
+      <div class="point-name">${point.name}</div>
+      <div class="point-file">${point.videoName}</div>
+      <div class="point-stat"><span>距起点</span><strong>${point.distanceFromStartKm ?? 0} km</strong></div>
+      <div class="point-stat"><span>开始时间</span><strong>${point.startTime}</strong></div>
+      <div class="point-stat"><span>状态</span><strong>${point.status}</strong></div>
+    `;
+
+    card.addEventListener("click", () => {
+      selectedPointId = point.id;
+      render();
+    });
+
+    card.addEventListener("dragstart", () => {
+      draggedPointId = point.id;
+      card.classList.add("selected");
+    });
+
+    card.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      card.classList.add("drag-over");
+    });
+
+    card.addEventListener("dragleave", () => {
+      card.classList.remove("drag-over");
+    });
+
+    card.addEventListener("drop", (event) => {
+      event.preventDefault();
+      card.classList.remove("drag-over");
+      route = movePoint(route, draggedPointId, point.id);
+      selectedPointId = draggedPointId;
+      draggedPointId = null;
+      render();
+    });
+
+    pointList.appendChild(card);
+  });
+}
+
+function renderDistances() {
+  distanceInputs.innerHTML = "";
+
+  if (route.points.length < 2) {
+    distanceInputs.innerHTML = '<p class="muted">至少需要两个视频点位才能设置相邻距离。</p>';
+    return;
+  }
+
+  route.points.slice(1).forEach((point, index) => {
+    const previous = route.points[index];
+    const label = document.createElement("label");
+    label.innerHTML = `
+      ${previous.name} 至 ${point.name}
+      <input type="number" min="0" step="0.05" value="${point.distanceFromPreviousKm}" data-id="${point.id}" />
+    `;
+    label.querySelector("input").addEventListener("input", (event) => {
+      route = updateSegmentDistance(route, point.id, event.target.value);
+      renderPoints();
+      renderTpiBars();
+    });
+    distanceInputs.appendChild(label);
+  });
+}
+
+function renderSelectedPoint() {
+  const point = getSelectedPoint();
+
+  if (!point) {
+    selectedPointName.textContent = "未选择点位";
+    selectedVideoFile.textContent = "请在左侧上传或选择视频卡片";
+    selectedPointFile.textContent = "点位信息";
+    videoFrame.innerHTML = '<div class="video-placeholder">暂无视频</div>';
+    setMetric("--", "--", "--", "--", "待分析");
+    return;
+  }
+
+  selectedPointName.textContent = point.name;
+  selectedVideoFile.textContent = point.videoName;
+  selectedPointFile.textContent = `开始时间 ${point.startTime} · 距起点 ${point.distanceFromStartKm ?? 0} km`;
+  setMetric(point.flow, point.density, point.avgSpeed, point.tpi, point.status);
+
+  if (point.fileUrl) {
+    const src = point.fileUrl.startsWith("/media/")
+      ? `${API_BASE}${point.fileUrl}`
+      : point.fileUrl;
+    const previewSrc = point.fileUrl.startsWith("/media/")
+      ? `${API_BASE}/preview/${encodeURIComponent(point.fileUrl.replace("/media/", ""))}`
+      : point.fileUrl;
+    videoFrame.innerHTML = `
+      <img class="video-preview-stream" src="${previewSrc}" alt="${point.videoName} 预览画面" />
+      <div class="video-actions">
+        <a href="${src}" target="_blank" rel="noreferrer">在新标签打开视频</a>
+        <span>当前使用后端帧流预览，可绕开原视频编码兼容问题。</span>
+      </div>
+    `;
+  } else {
+    videoFrame.innerHTML = `
+      <div class="video-placeholder">
+        <div>
+          <strong>预置视频点位</strong><br />
+          ${point.videoName}<br />
+          <span>接入真实视频后，此处播放原始/检测结果视频</span>
+        </div>
+      </div>
+    `;
+  }
+
+  if (point.analysisMessage) {
+    const note = document.createElement("p");
+    note.className = "analysis-note";
+    note.textContent = point.analysisMessage;
+    videoFrame.insertAdjacentElement("afterend", note);
+  }
+}
+
+function setMetric(flow, density, speed, tpi, status) {
+  flowValue.textContent = formatMetric(flow);
+  densityValue.textContent = formatMetric(density);
+  speedValue.textContent = formatMetric(speed);
+  tpiValue.textContent = formatMetric(tpi);
+  statusValue.textContent = status;
+}
+
+function formatMetric(value) {
+  if (value === "--" || value === undefined || value === null) {
+    return "--";
+  }
+  return Number(value).toFixed(2);
+}
+
+function renderTpiBars() {
+  tpiBars.innerHTML = "";
+
+  if (route.points.length === 0) {
+    tpiBars.innerHTML = '<p class="muted">暂无 TPI 数据。</p>';
+    return;
+  }
+
+  const maxTpi = Math.max(...route.points.map((point) => point.tpi || 0), 1);
+  route.points.forEach((point) => {
+    const row = document.createElement("div");
+    row.className = "tpi-row";
+    const percent = Math.max(6, Math.min(100, ((point.tpi || 0) / maxTpi) * 100));
+    row.innerHTML = `
+      <span>${point.name}</span>
+      <div class="bar-track"><div class="bar-fill" style="width: ${percent}%"></div></div>
+      <strong>${formatMetric(point.tpi)}</strong>
+    `;
+    tpiBars.appendChild(row);
+  });
+}
+
+function renderDecisionPlaceholder() {
+  decisionCard.innerHTML = `
+    <div class="section-title">预测与决策输出</div>
+    <p class="muted">完成路段排布后点击“开始预测”。系统会根据距离、时间和多点 TPI 趋势输出拥堵区间与应急车道建议。</p>
+  `;
+}
+
+function renderDecision(summary) {
+  decisionCard.innerHTML = `
+    <div class="section-title">预测与决策输出</div>
+    <div class="decision-status">${summary.status}</div>
+    <div class="decision-grid">
+      <div class="decision-item"><span>预警时间</span><strong>${summary.warningTime}</strong></div>
+      <div class="decision-item"><span>拥堵区间</span><strong>${summary.congestionWindow}</strong></div>
+      <div class="decision-item"><span>重点路段</span><strong>${summary.keySegment}</strong></div>
+    </div>
+    <p>${summary.reason}</p>
+    <div class="model-list">
+      ${summary.modelScores
+        .map(
+          (score) => `
+            <div class="model-row">
+              <strong>${score.model}</strong>
+              <span>MSE ${score.mse} · ${score.note}</span>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+render();
+    </script>
+  </body>
+</html>
