@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import time
 from urllib.parse import quote
 
@@ -6,23 +7,46 @@ from urllib.parse import quote
 def resolve_media_path(root, upload_dir, relative):
     if relative.startswith("preset/"):
         filename = relative[len("preset/") :]
-        search_paths = [
-            root.parent / "代码" / filename,
-            root.parent / "代码" / "code" / filename,
+        search_dirs = [
+            root / "preset-videos",
+            root / "uploads",
+            root / "media" / "preset",
+            root.parent / "代码",
+            root.parent / "代码" / "code",
+            root.parent / "代码" / "高速公路交通流数据",
         ]
-        target = next((candidate for candidate in search_paths if candidate.exists()), None)
-        if target is None:
-            stem = Path(filename).stem
-            for preset_dir in [root.parent / "代码", root.parent / "代码" / "code"]:
-                matches = sorted(preset_dir.glob(f"{stem}*.mp4")) if preset_dir.exists() else []
-                if matches:
-                    target = matches[0]
-                    break
-        return target
+        return find_video_file(filename, search_dirs)
 
     if relative.startswith("uploads/"):
         filename = relative[len("uploads/") :]
         return upload_dir / Path(filename).name
+
+    return None
+
+
+def find_video_file(filename, search_dirs):
+    safe_name = Path(filename).name
+    exact_matches = [directory / safe_name for directory in search_dirs]
+    target = next((candidate for candidate in exact_matches if candidate.exists()), None)
+    if target is not None:
+        return target
+
+    stem = Path(safe_name).stem
+    for directory in search_dirs:
+        if not directory.exists():
+            continue
+        matches = sorted(directory.rglob(f"{stem}*.mp4"))
+        if matches:
+            return matches[0]
+
+    timestamps = re.findall(r"20\d{12}", safe_name)
+    if timestamps:
+        for directory in search_dirs:
+            if not directory.exists():
+                continue
+            for candidate in sorted(directory.rglob("*.mp4")):
+                if all(timestamp in candidate.name for timestamp in timestamps):
+                    return candidate
 
     return None
 

@@ -8,6 +8,7 @@ from analyzer import (
 )
 from lane_decision import build_lane_decision
 from sample_data import get_preset_route
+from video_preview import resolve_media_path
 
 
 def test_preset_route():
@@ -56,6 +57,22 @@ def test_low_flow_low_density_does_not_produce_severe_tpi():
     assert calculate_tpi(flow=0.04, density=2.0, avg_speed=55.0) < 25
 
 
+def test_preset_preview_falls_back_to_uploads_when_project_is_moved(tmp_path):
+    root = tmp_path / "web-system"
+    upload_dir = root / "uploads"
+    upload_dir.mkdir(parents=True)
+    target = upload_dir / "1_1_20240501_20240501114103_20240501135755_114103.mp4"
+    target.write_bytes(b"fake mp4")
+
+    resolved = resolve_media_path(
+        root,
+        upload_dir,
+        "preset/1_1_20240501_20240501114103_20240501135755_114103.mp4",
+    )
+
+    assert resolved == target
+
+
 def test_lane_decision_holds_when_tpi_is_low():
     decision = build_lane_decision({"points": [{"tpi": 8}, {"tpi": 10}, {"tpi": 12}]})
     assert decision["decision"] == "暂不开启"
@@ -77,6 +94,10 @@ if __name__ == "__main__":
     test_dependency_status_reports_missing_yolo_stack()
     test_extract_real_time_from_filename()
     test_low_flow_low_density_does_not_produce_severe_tpi()
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+    with TemporaryDirectory() as directory:
+        test_preset_preview_falls_back_to_uploads_when_project_is_moved(Path(directory))
     test_lane_decision_holds_when_tpi_is_low()
     test_analyze_video_full_does_not_fake_results_when_dependencies_missing()
     print("backend tests passed")
